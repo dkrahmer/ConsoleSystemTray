@@ -18,8 +18,9 @@ Options
 -a              : sets the set of command-line arguments to use when starting the application
 -d              : sets the working directory for the process to be started
 -i              : sets the current icon of tray
+-m              : start minimized
 -t              : sets the ToolTip text of tray
--s				      : prevent Windows OS from entering Sleep mode
+-s              : prevent Windows OS from entering Sleep mode
 -h              : show the help message and exit
 ";
 
@@ -36,13 +37,17 @@ Options
 						return;
 					}
 
-					string path = cmds.GetArgument("-p");
-					string arguments = cmds.GetArgument("-a", true);
-					string baseDirectory = cmds.GetArgument("-d", true);
-					string icon = cmds.GetArgument("-i", true);
-					string tip = cmds.GetArgument("-t", true);
-					bool isPreventSleep = cmds.ContainsKey("-s");
-					Run(path, arguments, icon, baseDirectory, tip, isPreventSleep);
+					var options = new Options()
+					{
+						Path = cmds.GetArgument("-p"),
+						Arguments = cmds.GetArgument("-a", true),
+						BaseDirectory = cmds.GetArgument("-d", true),
+						Icon = cmds.GetArgument("-i", true),
+						Tip = cmds.GetArgument("-t", true),
+						IsPreventSleep = cmds.ContainsKey("-s"),
+						IsStartMinimized = cmds.ContainsKey("-m")
+					};
+					Run(options);
 				}
 				catch (CmdArgumentException e)
 				{
@@ -68,12 +73,12 @@ Options
 			Console.Error.WriteLine(kHelpCmdString);
 		}
 
-		private static void Run(string path, string arguments, string icon, string baseDirectory, string tip, bool isPreventSleep)
+		private static void Run(Options options)
 		{
 			Icon trayIcon;
-			if (!string.IsNullOrEmpty(icon))
+			if (!string.IsNullOrEmpty(options.Icon))
 			{
-				trayIcon = new Icon(icon);
+				trayIcon = new Icon(options.Icon);
 			}
 			else
 			{
@@ -82,28 +87,28 @@ Options
 
 			ProcessStartInfo processStartInfo = new ProcessStartInfo()
 			{
-				FileName = path,
+				FileName = options.Path,
 				ErrorDialog = true,
 			};
-			if (!string.IsNullOrEmpty(arguments))
+			if (!string.IsNullOrEmpty(options.Arguments))
 			{
-				processStartInfo.Arguments = arguments;
+				processStartInfo.Arguments = options.Arguments;
 			}
-			if (!string.IsNullOrEmpty(baseDirectory))
+			if (!string.IsNullOrEmpty(options.BaseDirectory))
 			{
-				processStartInfo.WorkingDirectory = baseDirectory;
+				processStartInfo.WorkingDirectory = options.BaseDirectory;
 			}
 
 			var p = Process.Start(processStartInfo);
 			ExitAtSame(p);
 			SwitchWindow(GetConsoleWindow());
 
-			if (isPreventSleep)
+			if (options.IsPreventSleep)
 			{
 				SetThreadExecutionState(EXECUTION_STATE.ES_CONTINUOUS | EXECUTION_STATE.ES_SYSTEM_REQUIRED);
 			}
 
-			string trapText = !string.IsNullOrEmpty(tip) ? tip : GetTrayText(p);
+			string trapText = !string.IsNullOrEmpty(options.Tip) ? options.Tip : GetTrayText(p);
 			NotifyIcon tray = new NotifyIcon
 			{
 				Icon = trayIcon,
@@ -116,6 +121,10 @@ Options
 			{
 				SwitchWindow(p.MainWindowHandle);
 			};
+
+			if (options.IsStartMinimized)
+				SwitchWindow(p.MainWindowHandle);
+
 			Application.Run();
 		}
 
