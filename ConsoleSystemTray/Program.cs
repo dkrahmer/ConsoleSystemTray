@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ConsoleSystemTray
@@ -47,6 +48,14 @@ Options
 						IsPreventSleep = cmds.ContainsKey("-s"),
 						IsStartMinimized = cmds.ContainsKey("-m")
 					};
+
+					if (Environment.OSVersion.Version.Major >= 6)
+					{
+						// Windows 11 requires conhost.exe to run console applications
+						options.Arguments = options.Path + (string.IsNullOrWhiteSpace(options.Arguments) ? "" : " " + options.Arguments);
+						options.Path = @"C:\Windows\System32\conhost.exe";
+					}
+
 					Run(options);
 				}
 				catch (CmdArgumentException e)
@@ -117,15 +126,62 @@ Options
 				BalloonTipText = trapText,
 				Visible = true,
 			};
+
 			tray.MouseDoubleClick += (s, e) =>
 			{
-				SwitchWindow(p.MainWindowHandle);
+				SwitchWindow(GetMainWindowHandle(p));
 			};
 
 			if (options.IsStartMinimized)
-				SwitchWindow(p.MainWindowHandle);
+			{
+				Task.Run(() =>
+				{
+					Thread.Sleep(100); // short delay to allow the console to fully initialize
+					SwitchWindow(GetMainWindowHandle(p));
+				});
+			}
 
 			Application.Run();
+		}
+
+		private static IntPtr GetMainWindowHandle(Process process)
+		{
+			IntPtr mainWindowHandle = process.MainWindowHandle;
+			if (mainWindowHandle == IntPtr.Zero)
+			{
+				mainWindowHandle = GetMainWindowHandleFromProcessId(process.Id);
+			}
+			return mainWindowHandle;
+		}
+
+		private static IntPtr GetMainWindowHandleFromProcessId(int processId)
+		{
+			ProcessThreadCollection processThreads = Process.GetProcessById(processId).Threads;
+			foreach (ProcessThread thread in processThreads)
+			{
+				IntPtr mainWindowHandle = GetMainWindowHandleFromThreadId(thread.Id);
+				if (mainWindowHandle != IntPtr.Zero)
+				{
+					return mainWindowHandle;
+				}
+			}
+			return IntPtr.Zero;
+		}
+
+		private static IntPtr GetMainWindowHandleFromThreadId(int threadId)
+		{
+			const int GW_OWNER = 4;
+			IntPtr mainWindowHandle = IntPtr.Zero;
+			EnumThreadWindows(threadId, (hWnd, lParam) =>
+			{
+				if (GetWindow(hWnd, GW_OWNER) == IntPtr.Zero)
+				{
+					mainWindowHandle = hWnd;
+					return false;
+				}
+				return true;
+			}, IntPtr.Zero);
+			return mainWindowHandle;
 		}
 
 		private static string GetTrayText(Process p)
@@ -158,11 +214,20 @@ Options
 			{
 				Environment.Exit(0);
 			};
+
 			AppDomain.CurrentDomain.ProcessExit += (s, e) =>
 			{
 				ExitProcess(p);
 			};
 		}
+
+		[DllImport("user32.dll")]
+		private static extern bool EnumThreadWindows(int threadId, EnumThreadDelegate callback, IntPtr lParam);
+
+		private delegate bool EnumThreadDelegate(IntPtr hWnd, IntPtr lParam);
+
+		[DllImport("user32.dll")]
+		private static extern IntPtr GetWindow(IntPtr hWnd, int uCmd);
 
 		[DllImport("user32.dll")]
 		private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
