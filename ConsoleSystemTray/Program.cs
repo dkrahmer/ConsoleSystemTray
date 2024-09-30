@@ -11,19 +11,20 @@ namespace ConsoleSystemTray
 {
 	class Program
 	{
-		private const string kHelpCmdString = @"Usage: ConsoleSystemTray.exe [-p filePath]
-Arguments 
--p              : the application or document to start
-
-Options
--a              : sets the set of command-line arguments to use when starting the application
--d              : sets the working directory for the process to be started
--i              : sets the current icon of tray
--m              : start minimized
--t              : sets the ToolTip text of tray
--s              : prevent Windows OS from entering Sleep mode
--h              : show the help message and exit
-";
+		private static readonly Lazy<string> _helpOutput = new(() => string.Concat("Usage: ConsoleSystemTray.exe [-p filePath]", "\n",
+			"\n",
+			"Arguments:", "\n",
+			"  -p\tthe console application to start", "\n",
+			"\n",
+			"Options:", "\n",
+			"  -a\tsets the application arguments", "\n",
+			"  -d\tsets the application working directory", "\n",
+			"  -i\tsets the tray icon", "\n",
+			"  -m\tstart minimized", "\n",
+			"  -t\tsets the tray icon tooltip text", "\n",
+			"  -s\tprevent Windows from entering sleep mode", "\n",
+			"  -h\tshow the help message and exit", "\n")
+		);
 
 		static void Main(string[] args)
 		{
@@ -60,13 +61,12 @@ Options
 				}
 				catch (CmdArgumentException e)
 				{
-					Console.Error.WriteLine(e.Message);
-					ShowHelpInfo();
+					ShowHelpInfo(e.Message);
 					Environment.ExitCode = -1;
 				}
 				catch (Exception e)
 				{
-					Console.Error.WriteLine(e.ToString());
+					MessageBox.Show(e.ToString(), "Exception", MessageBoxButtons.OK, MessageBoxIcon.Information);
 					Environment.ExitCode = -1;
 				}
 			}
@@ -77,9 +77,10 @@ Options
 			}
 		}
 
-		private static void ShowHelpInfo()
+		private static void ShowHelpInfo(string exceptionMessage = null)
 		{
-			Console.Error.WriteLine(kHelpCmdString);
+			bool isException = !string.IsNullOrEmpty(exceptionMessage);
+			MessageBox.Show((isException ? exceptionMessage + "\n\n\n" : "") + _helpOutput.Value, "Help", MessageBoxButtons.OK, isException ? MessageBoxIcon.Error : MessageBoxIcon.Information);
 		}
 
 		private static void Run(Options options)

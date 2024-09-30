@@ -9,6 +9,7 @@
     <RootNamespace>ConsoleSystemTray</RootNamespace>
     <AssemblyName>ConsoleSystemTray</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
+    <LangVersion>11.0</LangVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
